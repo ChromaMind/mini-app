@@ -1,8 +1,7 @@
 'use client';
 import { Trip } from '@/data/trips';
 import { WebSocketService } from '@/services/websocket';
-import { Button, LiveFeedback } from '@worldcoin/mini-apps-ui-kit-react';
-import { Pause, Play, Stop, X } from 'iconoir-react';
+import { Pause, Play, Square, X } from 'iconoir-react';
 import { useEffect, useState } from 'react';
 
 interface TripPlayerProps {
@@ -17,6 +16,7 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
     const [timeRemaining, setTimeRemaining] = useState(trip.duration);
     const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
     const [wsService] = useState(() => new WebSocketService());
+    const [matrixAnimation, setMatrixAnimation] = useState(0);
 
     useEffect(() => {
         wsService.setStatusCallback(setWsStatus);
@@ -53,6 +53,16 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
             setIsPlaying(false);
         }
     }, [timeRemaining, isPlaying, countdown, isPaused, wsService]);
+
+    // Matrix animation effect
+    useEffect(() => {
+        if (isPlaying && countdown === 0 && !isPaused) {
+            const interval = setInterval(() => {
+                setMatrixAnimation(prev => (prev + 1) % 8);
+            }, trip.blinkInterval);
+            return () => clearInterval(interval);
+        }
+    }, [isPlaying, countdown, isPaused, trip.blinkInterval]);
 
     const startTrip = () => {
         setIsPlaying(true);
@@ -96,6 +106,19 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
         }
     };
 
+    const getAnimatedMatrix = () => {
+        if (!isPlaying || countdown > 0 || isPaused) {
+            return trip.rgbMatrix;
+        }
+
+        // Create animated matrix by shifting rows
+        const shiftedMatrix = [...trip.rgbMatrix];
+        for (let i = 0; i < matrixAnimation; i++) {
+            shiftedMatrix.push(shiftedMatrix.shift()!);
+        }
+        return shiftedMatrix;
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md">
@@ -104,8 +127,11 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">{trip.name}</h2>
                         <div className="flex items-center gap-2 mt-1">
+                            <div className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                DEMO MODE
+                            </div>
                             <div className={`w-2 h-2 rounded-full ${wsStatus === 'connected' ? 'bg-green-500' :
-                                    wsStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                                wsStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
                                 }`} />
                             <span className={`text-sm ${getStatusColor(wsStatus)}`}>
                                 {wsStatus === 'connected' ? 'Connected' :
@@ -119,6 +145,33 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
                     >
                         <X className="w-5 h-5" />
                     </button>
+                </div>
+
+                {/* Animated RGB Matrix */}
+                <div className="bg-gray-900 rounded-xl p-4 mb-6">
+                    <div className="grid grid-cols-8 gap-1 mx-auto w-fit">
+                        {getAnimatedMatrix().map((row, rowIndex) => (
+                            row.split('').map((pixel, colIndex) => (
+                                <div
+                                    key={`${rowIndex}-${colIndex}`}
+                                    className="w-4 h-4 rounded-sm text-xs flex items-center justify-center transition-all duration-200"
+                                    style={{
+                                        backgroundColor:
+                                            pixel === '🔴' ? '#ef4444' :
+                                                pixel === '🟢' ? '#22c55e' :
+                                                    pixel === '🔵' ? '#3b82f6' :
+                                                        pixel === '🟡' ? '#eab308' :
+                                                            pixel === '🟣' ? '#a855f7' :
+                                                                pixel === '⚪' ? '#ffffff' :
+                                                                    '#374151',
+                                        opacity: isPlaying && countdown === 0 && !isPaused ? 1 : 0.7
+                                    }}
+                                >
+                                    {pixel}
+                                </div>
+                            ))
+                        ))}
+                    </div>
                 </div>
 
                 {/* Trip Info */}
@@ -147,48 +200,39 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
                 {/* Controls */}
                 <div className="flex gap-3">
                     {!isPlaying ? (
-                        <Button
+                        <button
                             onClick={startTrip}
-                            disabled={wsStatus !== 'connected'}
-                            size="lg"
-                            variant="primary"
-                            className="flex-1"
+                            className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center"
                         >
                             <Play className="w-4 h-4 mr-2" />
                             Start Trip
-                        </Button>
+                        </button>
                     ) : (
                         <>
                             {isPaused ? (
-                                <Button
+                                <button
                                     onClick={resumeTrip}
-                                    size="lg"
-                                    variant="primary"
-                                    className="flex-1"
+                                    className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center"
                                 >
                                     <Play className="w-4 h-4 mr-2" />
                                     Resume
-                                </Button>
+                                </button>
                             ) : (
-                                <Button
+                                <button
                                     onClick={pauseTrip}
-                                    size="lg"
-                                    variant="secondary"
-                                    className="flex-1"
+                                    className="flex-1 bg-gray-200 text-gray-800 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors flex items-center justify-center"
                                 >
                                     <Pause className="w-4 h-4 mr-2" />
                                     Pause
-                                </Button>
+                                </button>
                             )}
-                            <Button
+                            <button
                                 onClick={stopTrip}
-                                size="lg"
-                                variant="tertiary"
-                                className="flex-1"
+                                className="flex-1 bg-gray-100 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center"
                             >
-                                <Stop className="w-4 h-4 mr-2" />
+                                <Square className="w-4 h-4 mr-2" />
                                 Stop
-                            </Button>
+                            </button>
                         </>
                     )}
                 </div>
@@ -196,14 +240,12 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
                 {/* Emergency Stop */}
                 {isPlaying && (
                     <div className="mt-4">
-                        <Button
+                        <button
                             onClick={stopTrip}
-                            size="lg"
-                            variant="tertiary"
-                            className="w-full bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                            className="w-full bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-lg font-semibold hover:bg-red-100 transition-colors"
                         >
                             Emergency Stop
-                        </Button>
+                        </button>
                     </div>
                 )}
             </div>

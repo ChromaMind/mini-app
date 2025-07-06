@@ -17,7 +17,12 @@ export default async function Home() {
           title="Brain Entrainment"
           endAdornment={
             <div className="flex items-center gap-4">
-              <ConnectionStatus />
+              <div className="flex items-center gap-2">
+                <div className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                  DEMO MODE
+                </div>
+                <ConnectionStatus />
+              </div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold capitalize">
                   {mockUser.username}
