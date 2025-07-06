@@ -1,13 +1,20 @@
 'use client';
 import { Trip } from '@/data/trips';
 import { WebSocketService } from '@/services/websocket';
+import { zircuitContract, TripSession } from '@/services/contract';
 import { Pause, Play, Square, X } from 'iconoir-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface TripPlayerProps {
     trip: Trip;
     onClose: () => void;
 }
+
+const musicTracks = [
+    { name: 'Rave', file: '/music/rave.mp3' },
+    { name: 'Energy', file: '/music/energy.mp3' },
+    { name: 'NSDR', file: '/music/nsdr.mp3' },
+];
 
 export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -17,12 +24,21 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
     const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
     const [wsService] = useState(() => new WebSocketService());
     const [matrixAnimation, setMatrixAnimation] = useState(0);
+    const [audioTrack, setAudioTrack] = useState(musicTracks[0]);
+    const [currentSession, setCurrentSession] = useState<TripSession | null>(null);
+    const [contractStatus, setContractStatus] = useState(zircuitContract.getConnectionStatus());
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     useEffect(() => {
         wsService.setStatusCallback(setWsStatus);
 
         // Connect to WebSocket when component mounts
         wsService.connect().catch(console.error);
+
+        // Connect to smart contract
+        zircuitContract.connect().then(() => {
+            setContractStatus(zircuitContract.getConnectionStatus());
+        }).catch(console.error);
 
         return () => {
             wsService.disconnect();
@@ -50,7 +66,18 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
         } else if (timeRemaining === 0 && isPlaying) {
             // Trip finished
             wsService.stopTrip();
+
+            // End session on blockchain
+            if (currentSession) {
+                zircuitContract.endTripSession(currentSession.id, trip.duration)
+                    .then((endedSession) => {
+                        console.log("✅ Trip session recorded on blockchain:", endedSession.txHash);
+                    })
+                    .catch(console.error);
+            }
+
             setIsPlaying(false);
+            setCurrentSession(null);
         }
     }, [timeRemaining, isPlaying, countdown, isPaused, wsService]);
 
@@ -64,11 +91,46 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
         }
     }, [isPlaying, countdown, isPaused, trip.blinkInterval]);
 
-    const startTrip = () => {
-        setIsPlaying(true);
-        setCountdown(3);
-        setTimeRemaining(trip.duration);
-        setIsPaused(false);
+    useEffect(() => {
+        if (isPlaying && countdown === 0 && !isPaused) {
+            // Pick a random track and play
+            const randomTrack = musicTracks[Math.floor(Math.random() * musicTracks.length)];
+            setAudioTrack(randomTrack);
+            setTimeout(() => {
+                if (audioRef.current) {
+                    audioRef.current.currentTime = 0;
+                    audioRef.current.muted = false;
+                    audioRef.current.volume = 1;
+                    audioRef.current.play();
+                }
+            }, 200);
+        } else {
+            // Pause audio when not playing
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
+        }
+    }, [isPlaying, countdown, isPaused]);
+
+    const startTrip = async () => {
+        try {
+            // Start session on blockchain
+            const session = await zircuitContract.startTripSession(trip.id, trip.intensity || 7);
+            setCurrentSession(session);
+
+            setIsPlaying(true);
+            setCountdown(3);
+            setTimeRemaining(trip.duration);
+            setIsPaused(false);
+        } catch (error) {
+            console.error("Failed to start trip session:", error);
+            // Still start the trip even if blockchain fails
+            setIsPlaying(true);
+            setCountdown(3);
+            setTimeRemaining(trip.duration);
+            setIsPaused(false);
+        }
     };
 
     const pauseTrip = () => {
@@ -122,6 +184,9 @@ export const TripPlayer = ({ trip, onClose }: TripPlayerProps) => {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                {/* Audio element for music playback */}
+                <audio ref={audioRef} src={audioTrack.file} preload="auto" />
+
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>

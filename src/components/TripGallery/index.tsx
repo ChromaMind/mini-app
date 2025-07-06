@@ -8,14 +8,22 @@ import { useState } from 'react';
 
 export const TripGallery = () => {
     const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewTrip, setPreviewTrip] = useState<Trip | null | undefined>(undefined);
 
     const handleTripSelect = (trip: Trip) => {
         setSelectedTrip(trip);
     };
 
+    const handleTripPreview = (trip: Trip) => {
+        setPreviewTrip(trip);
+    };
+
     const handleClosePlayer = () => {
         setSelectedTrip(null);
+    };
+
+    const handleClosePreview = () => {
+        setPreviewTrip(null);
     };
 
     return (
@@ -34,7 +42,7 @@ export const TripGallery = () => {
                 </div>
                 <button
                     className="ml-4 px-4 py-2 bg-white text-blue-600 font-semibold rounded-lg shadow hover:bg-blue-50 transition"
-                    onClick={() => setPreviewOpen(true)}
+                    onClick={() => setPreviewTrip(undefined)}
                 >
                     Preview
                 </button>
@@ -55,6 +63,7 @@ export const TripGallery = () => {
                         key={trip.id}
                         trip={trip}
                         onSelect={handleTripSelect}
+                        onPreview={handleTripPreview}
                     />
                 ))}
             </div>
@@ -67,7 +76,11 @@ export const TripGallery = () => {
                 />
             )}
             {/* Matrix Preview Modal */}
-            <MatrixPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} />
+            <MatrixPreviewModal
+                open={previewTrip !== undefined}
+                trip={previewTrip}
+                onClose={handleClosePreview}
+            />
         </div>
     );
 }; 

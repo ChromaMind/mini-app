@@ -1,4 +1,5 @@
 'use client';
+import { Trip } from '@/data/trips';
 import { useEffect, useRef, useState } from 'react';
 
 const previewFrames = [
@@ -52,10 +53,11 @@ const musicTracks = [
 
 interface MatrixPreviewModalProps {
     open: boolean;
+    trip?: Trip | null;
     onClose: () => void;
 }
 
-export const MatrixPreviewModal = ({ open, onClose }: MatrixPreviewModalProps) => {
+export const MatrixPreviewModal = ({ open, trip, onClose }: MatrixPreviewModalProps) => {
     const [frame, setFrame] = useState(0);
     const [track, setTrack] = useState(musicTracks[0]);
     const audioRef = useRef<HTMLAudioElement>(null);
@@ -69,10 +71,18 @@ export const MatrixPreviewModal = ({ open, onClose }: MatrixPreviewModalProps) =
             setTimeout(() => {
                 audioRef.current?.play();
             }, 200);
-            // Animate frames
-            const interval = setInterval(() => {
-                setFrame((f) => (f + 1) % previewFrames.length);
-            }, 1000);
+            let interval: NodeJS.Timeout;
+            if (trip && trip.rgbMatrix) {
+                // Animate trip's rgbMatrix (8x8)
+                interval = setInterval(() => {
+                    setFrame((f) => (f + 1) % 8);
+                }, trip.blinkInterval);
+            } else {
+                // Animate global previewFrames (2x16)
+                interval = setInterval(() => {
+                    setFrame((f) => (f + 1) % previewFrames.length);
+                }, 1000);
+            }
             // Auto-close after 10 seconds
             const timeout = setTimeout(() => {
                 onClose();
@@ -84,19 +94,36 @@ export const MatrixPreviewModal = ({ open, onClose }: MatrixPreviewModalProps) =
                 audioRef.current!.currentTime = 0;
             };
         }
-    }, [open, onClose]);
+    }, [open, trip, onClose]);
+
+    // For per-trip: animate 8x8, for global: animate 2x16
+    const getMatrix = () => {
+        if (trip && trip.rgbMatrix) {
+            // Animate by shifting rows
+            const shifted = [...trip.rgbMatrix];
+            for (let i = 0; i < frame; i++) {
+                shifted.push(shifted.shift()!);
+            }
+            return shifted;
+        } else {
+            // Use previewFrames
+            return previewFrames[frame];
+        }
+    };
 
     if (!open) return null;
 
     return (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-6 w-full max-w-lg flex flex-col items-center">
-                <h2 className="text-xl font-bold mb-2">Preview: LED Matrix + Music</h2>
+                <h2 className="text-xl font-bold mb-2">
+                    {trip ? `Preview: ${trip.name}` : 'Preview: LED Matrix + Music'}
+                </h2>
                 <div className="mb-2 text-sm text-gray-500">Now Playing: <span className="font-semibold text-blue-600">{track.name}</span></div>
                 <audio ref={audioRef} src={track.file} preload="auto" />
                 <div className="bg-gray-900 rounded-lg p-2 mb-4">
                     <div className="flex flex-col gap-1">
-                        {previewFrames[frame].map((row, rowIdx) => (
+                        {getMatrix().map((row, rowIdx) => (
                             <div key={rowIdx} className="flex gap-1">
                                 {row.split('').map((pixel, colIdx) => (
                                     <div

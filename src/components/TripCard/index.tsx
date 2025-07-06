@@ -1,17 +1,23 @@
 'use client';
 import { Trip } from '@/data/trips';
-import { Play } from 'iconoir-react';
+import { Play, Eye } from 'iconoir-react';
 
 interface TripCardProps {
     trip: Trip;
     onSelect: (trip: Trip) => void;
+    onPreview: (trip: Trip) => void;
 }
 
-export const TripCard = ({ trip, onSelect }: TripCardProps) => {
+export const TripCard = ({ trip, onSelect, onPreview }: TripCardProps) => {
     const formatDuration = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return secs > 0 ? `${minutes}:${secs.toString().padStart(2, '0')}` : `${minutes}m`;
+    };
+
+    const handlePreviewClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onPreview(trip);
     };
 
     return (
@@ -51,6 +57,13 @@ export const TripCard = ({ trip, onSelect }: TripCardProps) => {
                 <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1">
                     <span className="text-white text-xs font-medium">{trip.mode.toUpperCase()}</span>
                 </div>
+                {/* Preview Button */}
+                <button
+                    onClick={handlePreviewClick}
+                    className="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-2 py-1 transition-colors"
+                >
+                    <Eye className="w-3 h-3" />
+                </button>
             </div>
 
             <div className="p-4">
